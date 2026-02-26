@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organization Chart</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f7f5f0;
+    padding: 40px 20px 80px;
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  .chart-title {
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #8a7e6e;
+    margin-bottom: 40px;
+  }
+
+  .tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Nodes ── */
+  .node {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    min-width: 160px;
+    max-width: 220px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  .node.visionary  { border-top: 4px solid #c9a96e; min-width: 240px; }
+  .node.integrator { border-top: 4px solid #7a9e87; min-width: 220px; }
+  .node.department { border-top: 4px solid #7a8ea8; min-width: 180px; }
+
+  /* Depth colors — cycles after depth 6 */
+  .node.depth-1 { border-top: 4px solid #a87a8e; }
+  .node.depth-2 { border-top: 4px solid #7a8ea8; }
+  .node.depth-3 { border-top: 4px solid #7aaa8e; }
+  .node.depth-4 { border-top: 4px solid #c9a96e; }
+  .node.depth-5 { border-top: 4px solid #a8907a; }
+  .node.depth-6 { border-top: 4px solid #8e7aa8; }
+
+  .node-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    color: #2c2c2c;
+    margin-bottom: 8px;
+    text-align: center;
+    min-height: 20px;
+  }
+
+  /* ── Subgroup name input ── */
+  .sg-name-input {
+    width: 100%;
+    border: none;
+    border-bottom: 1px dashed #c4a0b0;
+    background: transparent;
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    color: #2c2c2c;
+    padding: 2px 4px;
+    outline: none;
+    text-align: center;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .sg-name-input:focus { border-bottom-color: #a87a8e; }
+  .sg-name-input::placeholder { color: #ccc; font-style: italic; font-size: 11px; }
+
+  .sg-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── Roles ── */
+  .roles-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .role-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .role-input {
+    width: 100%;
+    border: none;
+    border-bottom: 1px dashed #d0c8bc;
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    color: #555;
+    padding: 2px 4px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .role-input:focus { border-bottom-color: #c9a96e; color: #222; }
+  .role-input::placeholder { color: #bbb; font-style: italic; }
+
+  /* ── Buttons ── */
+  .add-role-btn {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    background: none;
+    border: 1px dashed #d0c8bc;
+    border-radius: 6px;
+    padding: 3px;
+    font-size: 10px;
+    color: #aaa;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .add-role-btn:hover { border-color: #c9a96e; color: #c9a96e; background: #fdf9f3; }
+
+  .add-sg-btn {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    background: none;
+    border: 1px dashed #b8a0c0;
+    border-radius: 6px;
+    padding: 3px;
+    font-size: 10px;
+    color: #b8a0c0;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .add-sg-btn:hover { border-color: #a87a8e; color: #a87a8e; background: #fdf5f8; }
+
+  .del-btn {
+    background: none;
+    border: none;
+    color: #ddd;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .del-btn:hover { color: #e07070; }
+
+  /* ── Connectors ── */
+  .conn-v {
+    width: 2px;
+    background: #d5cfc6;
+    flex-shrink: 0;
+  }
+  .conn-v.sm { height: 20px; }
+  .conn-v.md { height: 28px; }
+
+  .conn-h {
+    height: 2px;
+    background: #d5cfc6;
+  }
+
+  /* ── Layout wrappers ── */
+  .dept-row-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .h-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .v-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Status / Loading ── */
+  #status {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    font-size: 11px;
+    font-family: 'DM Sans', sans-serif;
+    padding: 6px 14px;
+    border-radius: 20px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    color: #fff;
+  }
+  #status.show    { opacity: 1; }
+  #status.saving  { background: #c9a96e; }
+  #status.saved   { background: #7a9e87; }
+  #status.error   { background: #c97a7a; }
+
+  #loading {
+    position: fixed; inset: 0;
+    background: #f7f5f0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px; z-index: 100;
+    transition: opacity 0.4s;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid #d5cfc6;
+    border-top-color: #c9a96e;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { font-size: 12px; color: #8a7e6e; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Loading chart…</p>
+</div>
+
+<p class="chart-title">Organizational Structure</p>
+
+<div class="tree" id="tree">
+
+  <!-- VISIONARY -->
+  <div class="v-col">
+    <div class="node visionary">
+      <div class="node-label" id="label-visionary">Visionary</div>
+      <ul class="roles-list" id="roles-visionary"></ul>
+      <button class="add-role-btn" onclick="addRole('visionary')">+ Add Role</button>
+    </div>
+  </div>
+
+  <div class="conn-v md"></div>
+
+  <!-- INTEGRATOR -->
+  <div class="v-col">
+    <div class="node integrator">
+      <div class="node-label" id="label-integrator">Integrator</div>
+      <ul class="roles-list" id="roles-integrator"></ul>
+      <button class="add-role-btn" onclick="addRole('integrator')">+ Add Role</button>
+    </div>
+  </div>
+
+  <div class="conn-v md"></div>
+
+  <!-- DEPARTMENTS -->
+  <div class="dept-row-wrap">
+    <div class="conn-h" id="dept-hbar"></div>
+    <div class="h-row" id="dept-columns"></div>
+  </div>
+
+</div>
+
+<div id="status"></div>
+
+<script>
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzvRtMni8jaJCSA1JOY5zzMAMVM762fwMwWKJ-jxt51vARov_6VKSrOikYa2NpZo6zdPQ/exec';
+
+  const DEPT_DEFS = [
+    { id: 'sales',   label: 'Sales / Marketing' },
+    { id: 'ops',     label: 'Operations / Product' },
+    { id: 'finance', label: 'Finance' },
+    { id: 'hr',      label: 'HR' },
+  ];
+
+  const DEPTH_COLORS = ['#a87a8e','#7a8ea8','#7aaa8e','#c9a96e','#a8907a','#8e7aa8'];
+
+  const defaultLabels = {
+    visionary:'Visionary', integrator:'Integrator',
+    sales:'Sales / Marketing', ops:'Operations / Product',
+    finance:'Finance', hr:'HR',
+  };
+
+  const defaultRoles = {
+    visionary:  ['Chief Executive Officer','Chief Strategy Officer'],
+    integrator: ['Chief Operating Officer'],
+    sales:      ['Sales Director','Marketing Manager'],
+    ops:        ['Product Manager','Operations Lead'],
+    finance:    ['CFO','Financial Analyst'],
+    hr:         ['HR Director','Recruiter'],
+  };
+
+  const deptColumnsEl = document.getElementById('dept-columns');
+  const deptHBar      = document.getElementById('dept-hbar');
+  const statusEl      = document.getElementById('status');
+  const loadingEl     = document.getElementById('loading');
+  let saveTimer = null;
+  let sgCounter = 0;
+
+  // ── Dept columns ──────────────────────────────────────
+  DEPT_DEFS.forEach(dept => {
+    const col = document.createElement('div');
+    col.className = 'v-col';
+    col.id = 'deptcol-' + dept.id;
+    col.innerHTML = `
+      <div class="conn-v sm"></div>
+      <div class="node department">
+        <div class="node-label" id="label-${dept.id}">${dept.label}</div>
+        <ul class="roles-list" id="roles-${dept.id}"></ul>
+        <button class="add-role-btn" onclick="addRole('${dept.id}')">+ Add Role</button>
+        <button class="add-sg-btn" onclick="addSubgroup('${dept.id}', null, '', [], true, 1)">+ Add Subgroup</button>
+      </div>
+      <div class="conn-v sm" id="sgconn-${dept.id}" style="display:none;"></div>
+      <div class="dept-row-wrap" id="sgsection-${dept.id}" style="display:none;">
+        <div class="conn-h" id="sghbar-${dept.id}"></div>
+        <div class="h-row" id="sgcols-${dept.id}"></div>
+      </div>
+    `;
+    deptColumnsEl.appendChild(col);
+  });
+
+  // ── Helpers ───────────────────────────────────────────
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function depthColor(depth) {
+    return DEPTH_COLORS[(depth - 1) % DEPTH_COLORS.length];
+  }
+
+  function showStatus(msg, type, duration=2000) {
+    statusEl.textContent = msg;
+    statusEl.className = `show ${type}`;
+    clearTimeout(statusEl._t);
+    if (duration) statusEl._t = setTimeout(() => statusEl.className='', duration);
+  }
+
+  function applyLabels(labels) {
+    Object.entries(labels).forEach(([id,val]) => {
+      const el = document.getElementById('label-'+id);
+      if (el && val) el.textContent = val;
+    });
+  }
+
+  // ── Roles ─────────────────────────────────────────────
+  function addRole(sectionId, value='', andSave=true) {
+    const list = document.getElementById('roles-'+sectionId);
+    if (!list) return;
+    const li    = document.createElement('li');
+    li.className = 'role-item';
+    const inp   = document.createElement('input');
+    inp.className='role-input'; inp.type='text';
+    inp.value=value; inp.placeholder='Enter role…';
+    inp.addEventListener('input', scheduleSave);
+    inp.addEventListener('blur',  scheduleSave);
+    const del = document.createElement('button');
+    del.className='del-btn'; del.textContent='×'; del.title='Remove';
+    del.addEventListener('click', ()=>{ li.remove(); scheduleSave(); });
+    li.appendChild(inp); li.appendChild(del);
+    list.appendChild(li);
+    if (andSave) scheduleSave();
+  }
+
+  // ── Subgroups (recursive, infinite depth) ─────────────
+  // parentContainerId: the h-row div that holds this level's columns
+  // hbarId: the conn-h above that h-row
+  // connId: the conn-v above the section wrapper (for dept level)
+  // sectionId: the dept-row-wrap that wraps hbar+h-row
+
+  function addSubgroup(parentId, sgId=null, sgName='', roles=[], andSave=true, depth=1) {
+    // parentId is either a dept id (sales/ops/...) or a parent sg uid
+
+    // Figure out the container ids
+    const colsElId    = 'sgcols-'   + parentId;
+    const hbarElId    = 'sghbar-'   + parentId;
+    const sectionElId = 'sgsection-'+ parentId;
+    const connElId    = 'sgconn-'   + parentId;
+
+    const colsEl    = document.getElementById(colsElId);
+    const hbarEl    = document.getElementById(hbarElId);
+    const sectionEl = document.getElementById(sectionElId);
+    const connEl    = document.getElementById(connElId);
+
+    if (!colsEl) return null;
+
+    const uid   = sgId || ('sg_'+(++sgCounter)+'_'+Date.now());
+    const color = depthColor(depth);
+
+    // Show section
+    if (sectionEl) sectionEl.style.display = 'flex';
+    if (connEl)    connEl.style.display    = 'block';
+
+    // Build column
+    const col = document.createElement('div');
+    col.className = 'v-col';
+    col.id = 'sgcol-'+uid;
+    col.innerHTML = `
+      <div class="conn-v sm"></div>
+      <div class="node depth-${((depth-1)%6)+1}" id="sgnode-${uid}" style="border-top-color:${color}">
+        <div class="sg-header">
+          <input class="sg-name-input" id="sgname-${uid}" type="text"
+            value="${esc(sgName)}" placeholder="Subgroup name…" />
+          <button class="del-btn" id="sgdel-${uid}" title="Delete">×</button>
+        </div>
+        <ul class="roles-list" id="roles-${uid}"></ul>
+        <button class="add-role-btn" onclick="addRole('${uid}')">+ Add Role</button>
+        <button class="add-sg-btn" onclick="addSubgroup('${uid}', null, '', [], true, ${depth+1})">+ Add Subgroup</button>
+      </div>
+      <div class="conn-v sm" id="sgconn-${uid}" style="display:none;"></div>
+      <div class="dept-row-wrap" id="sgsection-${uid}" style="display:none;">
+        <div class="conn-h" id="sghbar-${uid}"></div>
+        <div class="h-row" id="sgcols-${uid}"></div>
+      </div>
+    `;
+
+    // Delete this subgroup (and all its children)
+    col.querySelector('#sgdel-'+uid).addEventListener('click', () => {
+      col.remove();
+      updateHBar(parentId);
+      // Hide section if no more siblings
+      const remaining = colsEl.querySelectorAll('.v-col');
+      if (remaining.length === 0) {
+        if (sectionEl) sectionEl.style.display = 'none';
+        if (connEl)    connEl.style.display    = 'none';
+      }
+      scheduleSave();
+    });
+
+    col.querySelector('#sgname-'+uid).addEventListener('input', scheduleSave);
+    col.querySelector('#sgname-'+uid).addEventListener('blur',  scheduleSave);
+
+    colsEl.appendChild(col);
+
+    // Add roles into this subgroup
+    roles.forEach(r => addRole(uid, r, false));
+
+    updateHBar(parentId);
+    if (andSave) scheduleSave();
+    return uid;
+  }
+
+  function updateHBar(parentId) {
+    const colsEl    = document.getElementById('sgcols-'+parentId);
+    const hbarEl    = document.getElementById('sghbar-'+parentId);
+    if (!colsEl || !hbarEl) return;
+
+    const cols = colsEl.querySelectorAll(':scope > .v-col');
+    if (cols.length === 0) { hbarEl.style.width='0'; return; }
+    if (cols.length === 1) { hbarEl.style.width='2px'; hbarEl.style.marginLeft=''; return; }
+
+    requestAnimationFrame(() => {
+      const first  = cols[0].getBoundingClientRect();
+      const last   = cols[cols.length-1].getBoundingClientRect();
+      const parent = colsEl.getBoundingClientRect();
+      const left   = first.left + first.width/2 - parent.left;
+      const right  = last.left  + last.width/2  - parent.left;
+      hbarEl.style.width      = Math.max(0, right-left)+'px';
+      hbarEl.style.marginLeft = left+'px';
+    });
+  }
+
+  function updateDeptHBar() {
+    const cols = deptColumnsEl.querySelectorAll(':scope > .v-col');
+    if (cols.length < 2) return;
+    const first  = cols[0].getBoundingClientRect();
+    const last   = cols[cols.length-1].getBoundingClientRect();
+    const parent = deptColumnsEl.getBoundingClientRect();
+    const left   = first.left + first.width/2 - parent.left;
+    const right  = last.left  + last.width/2  - parent.left;
+    deptHBar.style.width      = (right-left)+'px';
+    deptHBar.style.marginLeft = left+'px';
+  }
+
+  // ── Save ──────────────────────────────────────────────
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveData, 900);
+  }
+
+  // Recursively collect all nodes
+  function collectRows() {
+    const rows = [];
+
+    // Top-level sections
+    ['visionary','integrator',...DEPT_DEFS.map(d=>d.id)].forEach(id => {
+      document.querySelectorAll(`#roles-${id} > .role-item .role-input`).forEach(inp => {
+        const v = inp.value.trim();
+        if (v) rows.push({ section:id, parentsg:'', sgid:'', sgname:'', role:v, depth:0 });
+      });
+    });
+
+    // Recursively walk subgroups
+    function walkSG(parentId, depth) {
+      const colsEl = document.getElementById('sgcols-'+parentId);
+      if (!colsEl) return;
+      colsEl.querySelectorAll(':scope > .v-col').forEach(col => {
+        const uid    = col.id.replace('sgcol-','');
+        const nameEl = document.getElementById('sgname-'+uid);
+        const sgName = nameEl ? nameEl.value.trim() : '';
+
+        // Placeholder row so empty subgroups are persisted
+        rows.push({ section: parentId, parentsg: parentId, sgid: uid, sgname: sgName, role: '', depth });
+
+        // Roles inside this subgroup
+        document.querySelectorAll(`#roles-${uid} > .role-item .role-input`).forEach(inp => {
+          const v = inp.value.trim();
+          if (v) rows.push({ section: parentId, parentsg: parentId, sgid: uid, sgname: sgName, role: v, depth });
+        });
+
+        // Recurse into children
+        walkSG(uid, depth+1);
+      });
+    }
+
+    DEPT_DEFS.forEach(d => walkSG(d.id, 1));
+
+    return rows;
+  }
+
+  async function saveData() {
+    showStatus('Saving…','saving',0);
+    try {
+      await fetch(SCRIPT_URL, {
+        method:'POST', mode:'no-cors',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'save', data: collectRows() }),
+      });
+      showStatus('✓ Saved','saved',2000);
+    } catch(e) {
+      showStatus('⚠ Save failed','error',3000);
+    }
+  }
+
+  // ── Load ──────────────────────────────────────────────
+  async function loadData() {
+    try {
+      const res  = await fetch(SCRIPT_URL+'?t='+Date.now());
+      const json = await res.json();
+
+      if (json.labels) applyLabels(json.labels);
+
+      const rows = json.rows || [];
+
+      if (rows.length === 0) {
+        Object.entries(defaultRoles).forEach(([id,roles]) =>
+          roles.forEach(r => addRole(id, r, false))
+        );
+        saveData();
+      } else {
+        // Top-level roles (depth 0)
+        rows.filter(r => !r.parentsg && r.role).forEach(({ section, role }) => {
+          if (document.getElementById('roles-'+section)) addRole(section, role, false);
+        });
+
+        // Rebuild subgroup tree
+        // Group by sgid, preserving insertion order (depth-first)
+        const sgMap = new Map();
+        rows.filter(r => r.sgid).forEach(r => {
+          if (!sgMap.has(r.sgid)) {
+            sgMap.set(r.sgid, { parentsg: r.parentsg, sgid: r.sgid, sgname: r.sgname, depth: r.depth, roles: [] });
+          }
+          if (r.role) sgMap.get(r.sgid).roles.push(r.role);
+        });
+
+        // Build parent→children map
+        const childrenOf = {};
+        sgMap.forEach((sg) => {
+          const p = sg.parentsg;
+          if (!childrenOf[p]) childrenOf[p] = [];
+          childrenOf[p].push(sg);
+        });
+
+        // Recursively render
+        function renderChildren(parentId, depth) {
+          const children = childrenOf[parentId] || [];
+          children.forEach(sg => {
+            addSubgroup(parentId, sg.sgid, sg.sgname, sg.roles, false, depth);
+            renderChildren(sg.sgid, depth+1);
+          });
+        }
+
+        DEPT_DEFS.forEach(d => renderChildren(d.id, 1));
+      }
+
+    } catch(e) {
+      Object.entries(defaultRoles).forEach(([id,roles]) =>
+        roles.forEach(r => addRole(id, r, false))
+      );
+      showStatus('⚠ Could not load data','error',4000);
+    }
+
+    loadingEl.classList.add('hidden');
+    setTimeout(() => {
+      updateDeptHBar();
+      DEPT_DEFS.forEach(d => updateHBar(d.id));
+    }, 150);
+  }
+
+  window.addEventListener('resize', () => {
+    updateDeptHBar();
+    // Update all visible hbars
+    document.querySelectorAll('[id^="sghbar-"]').forEach(el => {
+      const pid = el.id.replace('sghbar-','');
+      updateHBar(pid);
+    });
+  });
+
+  loadData();
+</script>
+</body>
+</html>
